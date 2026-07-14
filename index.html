@@ -1,0 +1,87 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Intersection Designer V3</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,sans-serif;background:#f0f2f5;color:#222;display:flex;min-height:100vh}
+#sidebar{width:420px;min-width:420px;background:#fff;border-right:1px solid #ddd;padding:20px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+#sidebar textarea{width:100%;min-height:360px;font-family:Consolas,monospace;font-size:12.5px;padding:14px;border:1px solid #d4d6dc;border-radius:8px;resize:vertical;line-height:1.5;background:#fafbfc;tab-size:2}
+#sidebar textarea:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,0.12)}
+.btn-row{display:flex;gap:10px}
+.btn-row button{flex:1;padding:10px 16px;font-size:14px;font-weight:500;border:none;border-radius:8px;cursor:pointer}
+#genBtn{background:#2563eb;color:#fff}#genBtn:hover{background:#1d4ed8}
+#preBtn{background:#f0f2f5;color:#333;border:1px solid #d4d6dc}#preBtn:hover{background:#e4e6ea}
+#errBox{color:#dc2626;font-size:13px;padding:10px 14px;background:#fef2f2;border-radius:6px;display:none;line-height:1.5}
+#info{font-size:12px;color:#888;line-height:1.6}
+#main{flex:1;display:flex;align-items:center;justify-content:center;padding:32px;overflow:auto;background:#fff}
+#svgBox svg{display:block;max-width:100%;height:auto;border-radius:4px}
+h2{font-size:13px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.5px}
+</style>
+</head>
+<body>
+<div id="sidebar">
+<h2>JSON Input</h2>
+<textarea id="input" spellcheck="false">{
+"arms":[
+{"id":"n","name":"N","angle":90,"inLanes":3,"outLanes":2,"channelization":true,"refugeIsland":true,"twoStage":true},
+{"id":"e","name":"E","angle":0,"inLanes":3,"outLanes":2,"channelization":true,"refugeIsland":true,"twoStage":true},
+{"id":"s","name":"S","angle":270,"inLanes":3,"outLanes":2,"channelization":true,"refugeIsland":true,"twoStage":true},
+{"id":"w","name":"W","angle":180,"inLanes":3,"outLanes":2,"channelization":true,"refugeIsland":true,"twoStage":true}
+],
+"render":{"roadLength":40,"crossing":{"twoStage":true,"refugeWidth":0.8}}
+}</textarea>
+<div class="btn-row">
+<button id="genBtn">Generate</button>
+<button id="preBtn">Presets</button>
+</div>
+<div id="errBox"></div>
+<div id="info">Ready</div>
+</div>
+<div id="main"><div id="svgBox"></div></div>
+
+<script src="src/vec2.js"></script>
+<script src="src/model.js"></script>
+<script src="src/geometry.js"></script>
+<script src="src/renderer.js"></script>
+<script>
+"use strict";
+var inp=document.getElementById('input'),gen=document.getElementById('genBtn'),pre=document.getElementById('preBtn');
+var box=document.getElementById('svgBox'),err=document.getElementById('errBox'),inf=document.getElementById('info');
+
+var presets=[
+{name:"4-way",arms:[{id:"n",name:"N",angle:90,iL:3,oL:2},{id:"e",name:"E",angle:0,iL:3,oL:2},{id:"s",name:"S",angle:270,iL:3,oL:2},{id:"w",name:"W",angle:180,iL:3,oL:2}],render:{rd:40,crossing:{ts:true,rw:.8}}},
+{name:"T",arms:[{id:"s",name:"S",angle:270,iL:3,oL:2},{id:"e",name:"E",angle:0,iL:3,oL:2},{id:"w",name:"W",angle:180,iL:3,oL:2}],render:{rd:40,crossing:{ts:true,rw:.8}}},
+{name:"asym",arms:[{id:"e",name:"E",angle:0,iL:4,oL:2},{id:"n",name:"N",angle:90,iL:2,oL:1},{id:"w",name:"W",angle:180,iL:2,oL:2},{id:"s",name:"S",angle:270,iL:3,oL:2}],render:{rd:40,crossing:{ts:false,rw:0}}},
+{name:"5-way",arms:[{id:"e",name:"E",angle:0,iL:3,oL:2},{id:"ne",name:"NE",angle:45,iL:2,oL:1},{id:"n",name:"N",angle:90,iL:3,oL:2},{id:"w",name:"W",angle:180,iL:3,oL:2},{id:"s",name:"S",angle:270,iL:3,oL:2}],render:{rd:35,crossing:{ts:true,rw:.8}}},
+{name:"irreg",arms:[{id:"a",name:"A",angle:30,iL:3,oL:2},{id:"b",name:"B",angle:150,iL:3,oL:2},{id:"c",name:"C",angle:210,iL:3,oL:2},{id:"d",name:"D",angle:330,iL:3,oL:2}],render:{rd:40,crossing:{ts:true,rw:.8}}}
+];
+var pi=0;
+
+function doit(){
+  err.style.display='none';box.innerHTML='';
+  var j;try{j=JSON.parse(inp.value)}catch(e){err.textContent='JSON: '+e.message;err.style.display='block';return}
+  if(!j.arms||j.arms.length<2){err.textContent='Need >=2 arms';err.style.display='block';return}
+  try{
+    var arms=j.arms.map(function(a){return new RoadArm(a)});
+    var rgs=arms.map(function(a){return new RoadGeometry(a,40)});
+    var ig=new IntersectionGeometry(rgs);
+    var out=ig.build(j.render.roadLength||j.render.rd||40,j.render.crossing);
+    var svg=render(out);
+    box.innerHTML=svg;
+    var t=0;for(var i=0;i<arms.length;i++)t+=arms[i].inLanes+arms[i].outLanes;
+    inf.textContent=arms.length+' arms, '+t+' lanes, SVG '+svg.length+'B';
+  }catch(e){err.textContent=e.message||e;err.style.display='block'}
+}
+function cycle(){
+  pi=(pi+1)%presets.length;var p=presets[pi];
+  inp.value=JSON.stringify({arms:p.arms,render:p.render},null,2);doit()
+}
+gen.addEventListener('click',doit);pre.addEventListener('click',cycle);
+inp.addEventListener('keydown',function(e){if(e.ctrlKey&&e.key=='Enter'){e.preventDefault();doit()}});
+doit();
+</script>
+</body>
+</html>

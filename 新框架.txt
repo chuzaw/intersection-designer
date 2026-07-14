@@ -1,0 +1,447 @@
+我建议**不要在现在的代码基础上继续修修补补**。
+
+因为你的代码已经暴露出一个根本问题：
+
+> **RoadArm 负责坐标定义，Geometry 又重新定义了一套坐标体系。**
+
+这导致以后每增加一个功能（右转专用道、安全岛、公交道……），都会不断出现坐标不一致的问题。
+
+---
+
+## 我建议的重构思路（参考 CAD / GIS / OpenDRIVE 的做法）
+
+把整个程序拆成四层，而不是现在的两层。
+
+```text
+JSON
+   │
+   ▼
+Model（交通对象）
+   │
+   ▼
+Geometry（几何计算）
+   │
+   ▼
+Renderer（SVG）
+```
+
+但是要明确每层的职责。
+
+---
+
+# 第一层：Model（只负责数据）
+
+现在你的 `RoadArm` 最大的问题是：
+
+它一边保存参数：
+
+```javascript
+laneWidth
+laneCount
+angle
+```
+
+一边又计算：
+
+```javascript
+leftOrigin
+rightOrigin
+dir
+```
+
+甚至：
+
+```javascript
+pointAt()
+```
+
+这导致它既是"数据"，又是"几何"。
+
+建议改成：
+
+```javascript
+class RoadArm{
+
+    id
+
+    angle
+
+    lanes
+
+    laneWidth
+
+    channelization
+
+}
+```
+
+RoadArm 不再出现：
+
+```javascript
+leftOrigin
+rightOrigin
+pointAt
+```
+
+这些全部删除。
+
+它只负责：
+
+> 我是谁。
+
+而不是：
+
+> 我在哪里。
+
+---
+
+# 第二层：Geometry（唯一负责坐标）
+
+增加一个新类：
+
+```javascript
+RoadGeometry
+```
+
+例如：
+
+```javascript
+class RoadGeometry{
+
+    constructor(arm){
+
+        this.arm=arm;
+
+        ...
+
+    }
+
+}
+```
+
+这里统一计算：
+
+```text
+Road Center Line
+
+──────────────
+```
+
+然后：
+
+左右边界：
+
+```text
+──────────────
+```
+
+再：
+
+车道：
+
+```text
+| | | |
+```
+
+最后：
+
+停止线：
+
+```text
+=========
+```
+
+以后：
+
+所有坐标：
+
+全部来自：
+
+```javascript
+RoadGeometry
+```
+
+而不是：
+
+RoadArm。
+
+---
+
+# 第三层：IntersectionGeometry
+
+现在 build() 太长了。
+
+建议拆：
+
+```text
+IntersectionGeometry
+
+├── calcCenterPolygon()
+
+├── buildRoadPolygon()
+
+├── buildLaneDivider()
+
+├── buildCrosswalk()
+
+├── buildIsland()
+
+├── buildStopLine()
+```
+
+现在：
+
+build()
+
+已经 300 行左右。
+
+以后：
+
+右转专用道：
+
+又要加：
+
+100 行。
+
+会越来越难维护。
+
+---
+
+# 第四层：Renderer
+
+Renderer 目前其实写得不错。
+
+建议保持：
+
+Renderer 永远不要计算。
+
+例如：
+
+现在：
+
+```javascript
+var pos=arm.dir.scale(...)
+```
+
+应该删掉。
+
+Renderer：
+
+应该只画：
+
+```javascript
+polygon(points)
+
+line(points)
+
+text(point)
+```
+
+所有：
+
+point
+
+都来自：
+
+Geometry。
+
+---
+
+# Geometry 应该输出什么？
+
+我建议统一输出：
+
+```javascript
+{
+roads:[],
+
+laneDividers:[],
+
+crosswalks:[],
+
+stopLines:[],
+
+islands:[],
+
+texts:[]
+}
+```
+
+而不是：
+
+```javascript
+verts
+
+polys
+
+divs
+```
+
+这种偏算法名字。
+
+例如：
+
+```javascript
+roads:[
+
+{
+
+polygon:[...]
+
+}
+
+]
+```
+
+Renderer：
+
+只需要：
+
+```javascript
+for(road of roads){
+
+drawPolygon(...)
+
+}
+```
+
+---
+
+# 最关键的一步（也是你现在最需要改的）
+
+我建议彻底取消：
+
+```javascript
+RoadArm.pointAt()
+```
+
+为什么？
+
+因为：
+
+现在：
+
+```javascript
+RoadArm
+```
+
+里面：
+
+```javascript
+pointAt()
+
+laneCenterOffset()
+
+laneDividerOffset()
+```
+
+实际上已经属于：
+
+Geometry。
+
+应该改成：
+
+```javascript
+Geometry.pointAt()
+```
+
+例如：
+
+```javascript
+RoadGeometry.prototype.pointAt(...)
+```
+
+这样：
+
+RoadArm：
+
+完全不知道：
+
+坐标。
+
+Geometry：
+
+完全负责：
+
+坐标。
+
+以后：
+
+三岔：
+
+五岔：
+
+旋转：
+
+都不会互相影响。
+
+---
+
+# 我建议的最终目录
+
+```text
+src/
+
+├── model/
+│   ├── Vec2.js
+│   ├── Lane.js
+│   ├── RoadArm.js
+│   └── Intersection.js
+│
+├── geometry/
+│   ├── RoadGeometry.js
+│   ├── IntersectionGeometry.js
+│   ├── PolygonBuilder.js
+│   ├── LaneBuilder.js
+│   ├── CrosswalkBuilder.js
+│   ├── IslandBuilder.js
+│   └── StopLineBuilder.js
+│
+├── renderer/
+│   ├── SvgRenderer.js
+│   └── SvgStyle.js
+│
+└── app.js
+```
+
+---
+
+# 我认为还应该再进一步
+
+从你整个项目来看，你最终不是做一个"SVG画图工具"，而是做一个**交通工程交叉口参数化设计器**。
+
+因此，我建议把架构升级成**参数驱动建模（Parametric Modeling）**，而不是现在的"坐标驱动绘图"。
+
+整体流程建议改成：
+
+```text
+JSON（交通参数）
+        │
+        ▼
+Intersection Model（交通模型）
+        │
+        ▼
+Topology Builder（拓扑）
+        │
+        ▼
+Geometry Builder（几何）
+        │
+        ▼
+Marking Builder（标线）
+        │
+        ▼
+SVG Renderer（渲染）
+```
+
+这里最大的新增是 **Topology Builder（拓扑层）**。
+
+它负责描述：
+
+* 哪条车道连接哪条出口车道；
+* 哪条车道允许左转、直行、右转；
+* 右转专用道如何绕过导流岛；
+* 人行横道和安全岛的位置关系。
+
+有了这一层，后续增加右转专用道、公交专用道、潮汐车道、可变车道等功能时，只需要扩展拓扑规则，而不用重写几何算法。
+
+**如果这个工具准备长期开发，我建议直接采用这种架构，而不是继续在当前 `RoadArm + build()` 的结构上迭代。**我也可以帮你设计完整的 UML 类图、JSON 规范以及每个 Builder 的接口，让整个项目更接近专业 CAD/GIS 软件的设计方式。
