@@ -6,8 +6,8 @@
 <title>Intersection Designer V3</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:system-ui,sans-serif;background:#f0f2f5;color:#222;display:flex;min-height:100vh}
-#sidebar{width:420px;min-width:420px;background:#fff;border-right:1px solid #ddd;padding:20px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+body{font-family:system-ui,sans-serif;background:#f0f2f5;color:#222;display:flex;height:100vh;overflow:hidden}
+#sidebar{width:360px;min-width:360px;background:#fff;border-right:1px solid #ddd;padding:20px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
 #sidebar textarea{width:100%;min-height:360px;font-family:Consolas,monospace;font-size:12.5px;padding:14px;border:1px solid #d4d6dc;border-radius:8px;resize:vertical;line-height:1.5;background:#fafbfc;tab-size:2}
 #sidebar textarea:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,0.12)}
 .btn-row{display:flex;gap:10px}
@@ -17,8 +17,19 @@ body{font-family:system-ui,sans-serif;background:#f0f2f5;color:#222;display:flex
 #errBox{color:#dc2626;font-size:13px;padding:10px 14px;background:#fef2f2;border-radius:6px;display:none;line-height:1.5}
 #info{font-size:12px;color:#888;line-height:1.6}
 #main{flex:1;display:flex;align-items:center;justify-content:center;padding:32px;overflow:auto;background:#fff}
-#svgBox svg{display:block;max-width:100%;height:auto;border-radius:4px}
+#svgBox{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+#svgBox svg{display:block;width:100%;height:100%;max-width:100%;max-height:100%;border-radius:4px}
 h2{font-size:13px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.5px}
+#configPanel{width:310px;min-width:310px;background:#fafafa;border-left:1px solid #ddd;padding:18px;overflow-y:auto}
+.config-section{background:#fff;border:1px solid #e2e4e8;border-radius:8px;padding:12px;margin-top:12px}
+.config-title{font-size:13px;font-weight:700;color:#ef4444;margin-bottom:10px}
+.field{display:grid;grid-template-columns:92px 1fr;align-items:center;gap:8px;margin:8px 0;font-size:13px}
+.field input,.field select{width:100%;height:32px;border:1px solid #cfd3da;border-radius:5px;padding:4px 8px;background:#fff;color:#222}
+.unit-field{display:grid;grid-template-columns:1fr 22px;align-items:center;gap:4px}.unit{color:#777;text-align:center}
+.arrow-editor{margin-top:12px;padding-top:10px;border-top:1px solid #eceef1}.arrow-heading{font-size:12px;font-weight:700;color:#555;margin-bottom:6px}.arrow-row{display:grid;grid-template-columns:92px 1fr;align-items:center;gap:8px;margin:7px 0;font-size:12px}.arrow-row select{width:100%;height:30px;border:1px solid #cfd3da;border-radius:5px;padding:3px 6px;background:#fff}
+.panel-actions{display:flex;gap:8px;margin-top:12px}.panel-actions button{flex:1;border:1px solid #cfd3da;background:#fff;border-radius:6px;padding:8px;cursor:pointer}.panel-actions button:hover{background:#f3f4f6}
+#addArm{color:#2563eb}#delArm{color:#dc2626}
+@media(max-width:1100px){#sidebar{width:310px;min-width:310px}#configPanel{width:270px;min-width:270px}#main{padding:16px}}
 </style>
 </head>
 <body>
@@ -41,6 +52,25 @@ h2{font-size:13px;font-weight:600;color:#555;text-transform:uppercase;letter-spa
 <div id="info">Ready</div>
 </div>
 <div id="main"><div id="svgBox"></div></div>
+<aside id="configPanel">
+<h2>参数配置</h2>
+<div class="config-section">
+<div class="config-title">交叉口臂</div>
+<label class="field"><span>选择臂</span><select id="armSelect"></select></label>
+<label class="field"><span>路名</span><input id="armName" type="text" placeholder="输入道路名称"></label>
+<label class="field"><span>方向角</span><div class="unit-field"><input id="armAngle" type="number" min="0" max="359" step="1"><span class="unit">°</span></div></label>
+<label class="field"><span>进口车道</span><select id="inLanes"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label>
+<label class="field"><span>出口车道</span><select id="outLanes"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label>
+<label class="field"><span>人行横道</span><select id="crosswalk"><option value="true">是</option><option value="false">否</option></select></label>
+<label class="field"><span>二次过街安全岛</span><select id="twoStageIsland"><option value="true">是</option><option value="false">否</option></select></label>
+<div id="laneArrowEditor" class="arrow-editor"></div>
+<div class="panel-actions"><button id="addArm">新增路口臂</button><button id="delArm">删除当前臂</button></div>
+</div>
+<div class="config-section">
+<div class="config-title">整体参数</div>
+<label class="field"><span>道路长度</span><div class="unit-field"><input id="roadLength" type="number" min="25" max="100" step="1"><span class="unit">m</span></div></label>
+</div>
+</aside>
 
 <script src="src/vec2.js"></script>
 <script src="src/model.js"></script>
@@ -50,6 +80,12 @@ h2{font-size:13px;font-weight:600;color:#555;text-transform:uppercase;letter-spa
 "use strict";
 var inp=document.getElementById('input'),gen=document.getElementById('genBtn'),pre=document.getElementById('preBtn');
 var box=document.getElementById('svgBox'),err=document.getElementById('errBox'),inf=document.getElementById('info');
+var armSelect=document.getElementById('armSelect'),armName=document.getElementById('armName'),armAngle=document.getElementById('armAngle');
+var inLanes=document.getElementById('inLanes'),outLanes=document.getElementById('outLanes'),crosswalk=document.getElementById('crosswalk');
+var twoStageIsland=document.getElementById('twoStageIsland'),laneArrowEditor=document.getElementById('laneArrowEditor'),roadLength=document.getElementById('roadLength');
+var addArm=document.getElementById('addArm'),delArm=document.getElementById('delArm'),activeArm=0;
+var arrowTypes=[['left','左转'],['through','直行'],['right','右转'],['through-left','直左'],['through-right','直右'],['left-right','左右'],['uturn','掉头'],['left-uturn','左掉头'],['through-uturn','直掉头'],['none','无箭头']];
+var arrowFiles={left:'左转',through:'直行',right:'右转','through-left':'直左','through-right':'直右','left-right':'左右',uturn:'掉头','left-uturn':'左掉头','through-uturn':'直掉头',none:'none'};
 
 var presets=[
 {name:"4-way",arms:[{id:"n",name:"N",angle:90,iL:3,oL:2},{id:"e",name:"E",angle:0,iL:3,oL:2},{id:"s",name:"S",angle:270,iL:3,oL:2},{id:"w",name:"W",angle:180,iL:3,oL:2}],render:{rd:40,crossing:{ts:true,rw:.8}}},
@@ -60,11 +96,37 @@ var presets=[
 ];
 var pi=0;
 
-function doit(){
+function parseInput(){try{return JSON.parse(inp.value)}catch(e){return null}}
+function normalize(j){
+  j.render=j.render||{};j.render.crossing=j.render.crossing||{};
+  if(j.render.roadLength==null)j.render.roadLength=j.render.rd||40;
+  if(j.render.crossing.twoStage==null)j.render.crossing.twoStage=!!j.render.crossing.ts;
+  if(j.render.crossing.refugeWidth==null)j.render.crossing.refugeWidth=j.render.crossing.rw==null ? .8 : j.render.crossing.rw;
+  for(var i=0;i<j.arms.length;i++){var a=j.arms[i];if(a.inLanes==null)a.inLanes=a.iL||1;if(a.outLanes==null)a.outLanes=a.oL||1;if(a.crosswalk==null)a.crosswalk=true;if(a.twoStage==null)a.twoStage=a.ts!=null?!!a.ts:!!(a.refugeIsland||a.ri||j.render.crossing.twoStage);a.refugeIsland=!!a.twoStage;if(!a.inLaneArrows)a.inLaneArrows=a.iA||[]}
+  return j
+}
+function defaultArrow(n,i){if(n<=1)return'through';if(n==2)return i==0?'left':'right';return i==0?'left':(i==n-1?'right':'through')}
+function renderLaneArrows(a){laneArrowEditor.innerHTML='<div class="arrow-heading">进口道逐车道箭头（由中央向外）</div>';for(var i=0;i<a.inLanes;i++){var row=document.createElement('label');row.className='arrow-row';var sp=document.createElement('span');sp.textContent='车道 '+(i+1)+(i==0?'（内侧）':'');var sel=document.createElement('select');sel.className='lane-arrow';sel.dataset.lane=i;var current=(a.inLaneArrows||[])[i]||defaultArrow(a.inLanes,i);for(var k=0;k<arrowTypes.length;k++){var op=document.createElement('option');op.value=arrowTypes[k][0];op.textContent=arrowTypes[k][1];if(op.value==current||arrowFiles[op.value]==current)op.selected=true;sel.appendChild(op)}sel.addEventListener('change',updateFromPanel);row.appendChild(sp);row.appendChild(sel);laneArrowEditor.appendChild(row)}}
+function syncPanel(j){
+  if(!j||!j.arms||!j.arms.length)return;normalize(j);activeArm=Math.max(0,Math.min(activeArm,j.arms.length-1));
+  armSelect.innerHTML='';for(var i=0;i<j.arms.length;i++){var op=document.createElement('option');op.value=i;op.textContent=(i+1)+' · '+(j.arms[i].name||j.arms[i].id||'未命名');armSelect.appendChild(op)}armSelect.value=activeArm;
+  var a=j.arms[activeArm];armName.value=a.name||'';armAngle.value=a.angle==null?0:a.angle;inLanes.value=a.inLanes;outLanes.value=a.outLanes;
+  crosswalk.value=String(a.crosswalk!==false);twoStageIsland.value=String(!!a.twoStage);roadLength.value=j.render.roadLength;renderLaneArrows(a)
+}
+function updateFromPanel(){
+  var j=parseInput();if(!j||!j.arms||!j.arms.length)return;normalize(j);var a=j.arms[activeArm];
+  var oldLanes=a.inLanes,newLanes=Number(inLanes.value);a.name=armName.value;a.angle=((Number(armAngle.value)||0)%360+360)%360;a.inLanes=newLanes;a.outLanes=Number(outLanes.value);
+  a.crosswalk=crosswalk.value==='true';a.twoStage=twoStageIsland.value==='true';a.refugeIsland=a.twoStage;if(oldLanes!=newLanes){a.inLaneArrows=[];for(var i=0;i<newLanes;i++)a.inLaneArrows.push(arrowFiles[defaultArrow(newLanes,i)])}else{a.inLaneArrows=[];var sels=laneArrowEditor.querySelectorAll('.lane-arrow');for(var i=0;i<newLanes;i++)a.inLaneArrows.push(arrowFiles[sels[i]?sels[i].value:defaultArrow(newLanes,i)])}j.render.roadLength=Math.max(25,Number(roadLength.value)||40);j.render.crossing.refugeWidth=.8;
+  inp.value=JSON.stringify(j,null,2);doit(false);syncPanel(j)
+}
+function nextArmAngle(arms){var aa=arms.map(function(a){return((Number(a.angle)||0)%360+360)%360}).sort(function(a,b){return a-b}),best=0,gap=-1;for(var i=0;i<aa.length;i++){var d=(aa[(i+1)%aa.length]+(i==aa.length-1?360:0))-aa[i];if(d>gap){gap=d;best=(aa[i]+d/2)%360}}return Math.round(best)}
+
+function doit(updatePanel){
   err.style.display='none';box.innerHTML='';
   var j;try{j=JSON.parse(inp.value)}catch(e){err.textContent='JSON: '+e.message;err.style.display='block';return}
   if(!j.arms||j.arms.length<2){err.textContent='Need >=2 arms';err.style.display='block';return}
   try{
+    normalize(j);
     var arms=j.arms.map(function(a){return new RoadArm(a)});
     var rgs=arms.map(function(a){return new RoadGeometry(a,40)});
     var ig=new IntersectionGeometry(rgs);
@@ -73,14 +135,19 @@ function doit(){
     box.innerHTML=svg;
     var t=0;for(var i=0;i<arms.length;i++)t+=arms[i].inLanes+arms[i].outLanes;
     inf.textContent=arms.length+' arms, '+t+' lanes, SVG '+svg.length+'B';
+    if(updatePanel!==false)syncPanel(j);
   }catch(e){err.textContent=e.message||e;err.style.display='block'}
 }
 function cycle(){
   pi=(pi+1)%presets.length;var p=presets[pi];
-  inp.value=JSON.stringify({arms:p.arms,render:p.render},null,2);doit()
+  activeArm=0;inp.value=JSON.stringify({arms:p.arms,render:p.render},null,2);doit()
 }
 gen.addEventListener('click',doit);pre.addEventListener('click',cycle);
 inp.addEventListener('keydown',function(e){if(e.ctrlKey&&e.key=='Enter'){e.preventDefault();doit()}});
+armSelect.addEventListener('change',function(){activeArm=Number(armSelect.value);syncPanel(parseInput())});
+[armName,armAngle,inLanes,outLanes,crosswalk,twoStageIsland,roadLength].forEach(function(el){el.addEventListener('change',updateFromPanel)});
+addArm.addEventListener('click',function(){var j=parseInput();if(!j||!j.arms)return;normalize(j);var n=j.arms.length,ang=n?nextArmAngle(j.arms):0;j.arms.push({id:'arm'+(n+1),name:'方向'+(n+1),angle:ang,inLanes:3,outLanes:2,crosswalk:true,twoStage:true,refugeIsland:true,inLaneArrows:['左转','直行','右转']});activeArm=j.arms.length-1;inp.value=JSON.stringify(j,null,2);doit()});
+delArm.addEventListener('click',function(){var j=parseInput();if(!j||!j.arms)return;if(j.arms.length<=2){err.textContent='至少需要保留 2 个路口臂';err.style.display='block';return}j.arms.splice(activeArm,1);activeArm=Math.max(0,activeArm-1);inp.value=JSON.stringify(j,null,2);doit()});
 doit();
 </script>
 </body>

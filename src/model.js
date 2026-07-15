@@ -11,7 +11,7 @@ function RoadArm(j){
   this.channelization=j.channelization||false;
   this.crosswalk=j.crosswalk!==false;
   this.refugeIsland=j.refugeIsland||j.ri||false;
-this.twoStage=j.twoStage||j.ts||false;
+this.twoStage=j.twoStage!=null?!!j.twoStage:(j.ts!=null?!!j.ts:null);
 this.inLaneArrows=j.inLaneArrows||j.iA||[];
 }
 w.RoadArm=RoadArm;
