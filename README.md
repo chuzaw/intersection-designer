@@ -2,6 +2,18 @@
 
 [中文](#中文) | [English](#english)
 
+## 预览 / Preview
+
+### 操作界面 / User Interface
+
+![Intersection Designer 操作界面 / User interface](docs/images/interface-overview.png)
+
+### 路口示例 / Intersection Examples
+
+| 四岔路口 / Four-way intersection | 五岔路口 / Five-way intersection |
+| --- | --- |
+| <img src="docs/images/four-way-example.png" alt="四岔路口示例 / Four-way intersection example" width="600"> | <img src="docs/images/five-way-example.png" alt="五岔路口示例 / Five-way intersection example" width="600"> |
+
 ## 中文
 
 ### 项目简介
